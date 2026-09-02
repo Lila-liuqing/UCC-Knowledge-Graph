@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>理解当代中国 · 知识图谱</title>
+    <!-- 引入 ECharts 核心库 -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <style>
+        /* 让画布铺满整个屏幕 */
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #f8f9fa; }
+        #main {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+        }
+        /* 右下角水印（可删除） */
+        .footer {
+            position: absolute;
+            bottom: 20px;
+            right: 30px;
+            color: #888;
+            font-family: 'Microsoft YaHei', sans-serif;
+            font-size: 14px;
+            background: rgba(255,255,255,0.7);
+            padding: 4px 12px;
+            border-radius: 20px;
+            pointer-events: none;
+        }
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Microsoft YaHei', sans-serif;
+            color: #666;
+            font-size: 18px;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <div id="main"></div>
+    <div class="loading" id="loadingTip">⏳ 正在加载知识图谱数据...</div>
+    <div class="footer">北外大创 · 理解当代中国</div>
+
+    <script>
+        // --- 1. 获取图表容器并初始化 ---
+        var chartDom = document.getElementById('main');
+        var myChart = echarts.init(chartDom);
+
+        // --- 2. 加载 data.json ---
+        fetch('data.json')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('HTTP 错误! 状态码: ' + response.status);
+                }
+                return response.json();
+            })
+            .then(data => {
+                // 隐藏加载提示
+                document.getElementById('loadingTip').style.display = 'none';
+
+                // 检查数据是否为空
+                if (!data.nodes || data.nodes.length === 0) {
+                    throw new Error('数据为空，请检查 data.json 文件');
+                }
+
+                console.log('✅ 数据加载成功！节点数:', data.nodes.length, '关系数:', data.links.length);
+
+                // --- 3. 定义节点分类（用于图例）---
+                // 分类索引对应 convert.py 里的 category: 0=核心概念, 1=具体要素, 2=翻译难点
+                var categories = [
+                    { name: '核心概念', itemStyle: { color: '#C41A1A' } },  // 中国红
+                    { name: '具体要素', itemStyle: { color: '#1E88E5' } },  // 亮蓝
+                    { name: '翻译难点', itemStyle: { color: '#F57C00' } }   // 橙色
+                ];
+
+                // --- 4. 配置 ECharts 力导向图 ---
+                var option = {
+                    title: {
+                        text: '理解当代中国 · 术语知识图谱',
+                        subtext: '节点可拖拽 · 滚轮缩放',
+                        left: 'center',
+                        top: 20,
+                        textStyle: { color: '#333', fontSize: 20, fontWeight: 'bold' },
+                        subtextStyle: { color: '#888', fontSize: 12 }
+                    },
+                    // 提示框（鼠标悬停时显示）
+                    tooltip: {
+                        trigger: 'item',
+                        formatter: function(params) {
+                            if (params.dataType === 'node') {
+                                // 显示节点的详细信息
+                                var desc = params.data.desc || '暂无描述';
+                                // 限制描述长度，防止弹窗过大
+                                if (desc.length > 200) desc = desc.substring(0, 200) + '...';
+                                return `<strong>${params.data.name}</strong><br/>
+                                        <span style="color:#999;">ID: ${params.data.id}</span><br/>
+                                        <span style="color:#666;">类型: ${params.data.type || '未知'}</span><br/>
+                                        <span style="color:#666;">英文: ${params.data.eng || '--'}</span><br/>
+                                        <hr style="margin:4px 0;"/>
+                                        <span style="font-size:12px;">${desc}</span>`;
+                            } else if (params.dataType === 'edge') {
+                                // 显示关系信息
+                                return `<strong>关系</strong><br/>
+                                        来源: ${params.data.source}<br/>
+                                        目标: ${params.data.target}<br/>
+                                        类型: ${params.data.relation || '包含'}`;
+                            }
+                        }
+                    },
+                    // 图例（左上角显示分类颜色）
+                    legend: {
+                        data: categories.map(c => c.name),
+                        orient: 'vertical',
+                        left: 20,
+                        top: 80,
+                        itemWidth: 14,
+                        itemHeight: 14,
+                        textStyle: { color: '#333', fontSize: 12 }
+                    },
+                    series: [{
+                        type: 'graph',               // 图表类型：关系图
+                        layout: 'force',             // 力导向布局（节点会自动散开）
+                        force: {
+                            repulsion: 500,          // 节点之间的斥力（越大越分散）
+                            edgeLength: [100, 300],  // 边的长度范围
+                            gravity: 0.1,            // 节点向中心的引力
+                            friction: 0.1,
+                            layoutAnimation: true
+                        },
+                        roam: true,                  // 允许缩放和平移
+                        draggable: true,             // 允许拖拽节点
+                        focusNodeAdjacency: true,    // 悬停节点时高亮相邻节点和边
+                        data: data.nodes,            // 节点数据
+                        links: data.links,           // 关系数据
+                        categories: categories,      // 分类映射
+                        // 节点样式
+                        itemStyle: {
+                            borderColor: '#fff',
+                            borderWidth: 1,
+                            shadowBlur: 6,
+                            shadowColor: 'rgba(0,0,0,0.2)'
+                        },
+                        // 节点标签（显示名称）
+                        label: {
+                            show: true,
+                            position: 'right',
+                            fontSize: 11,
+                            color: '#333',
+                            offset: [5, 0],
+                            formatter: function(params) {
+                                // 如果节点名称太长，截断显示
+                                if (params.name.length > 12) {
+                                    return params.name.substring(0, 10) + '..';
+                                }
+                                return params.name;
+                            }
+                        },
+                        // 边的样式（连接线）
+                        lineStyle: {
+                            color: 'source',         // 线条颜色跟随源节点
+                            curveness: 0.2,          // 曲线程度（避免重叠）
+                            width: 1.5,
+                            opacity: 0.6
+                        },
+                        // 边上的文字（显示关系类型）
+                        edgeLabel: {
+                            show: false,             // 默认关闭，避免太拥挤
+                            formatter: function(params) {
+                                return params.data.relation || '';
+                            },
+                            fontSize: 10,
+                            color: '#666'
+                        },
+                        // 节点大小
+                        symbolSize: function(value, params) {
+                            // 根据节点的 symbolSize 属性调整，或按类型调整
+                            return params.data.symbolSize || 25;
+                        },
+                        // 动画时长
+                        animationDuration: 1500,
+                        animationEasingUpdate: 'quinticInOut'
+                    }]
+                };
+
+                // --- 5. 设置图表并适配窗口 ---
+                myChart.setOption(option);
+
+                // 窗口大小变化时自动适配
+                window.addEventListener('resize', function() {
+                    myChart.resize();
+                });
+
+                // 在控制台输出加载成功信息（方便调试）
+                console.log('🎉 图谱渲染完成！');
+
+            })
+            .catch(error => {
+                // --- 错误处理：如果 data.json 加载失败 ---
+                document.getElementById('loadingTip').innerHTML = `
+                    ❌ 加载失败！<br/>
+                    <span style="font-size:14px;color:#999;">${error.message}</span><br/>
+                    <span style="font-size:13px;color:#888;">请确保已启动服务器（python -m http.server 8000）且 data.json 文件存在。</span>
+                `;
+                document.getElementById('loadingTip').style.color = '#c62828';
+                console.error('加载错误:', error);
+            });
+
+        // 额外的错误捕获：如果 ECharts 本身报错
+        window.onerror = function(msg) {
+            console.error('ECharts 渲染错误:', msg);
+        };
+    </script>
+</body>
+</html>
