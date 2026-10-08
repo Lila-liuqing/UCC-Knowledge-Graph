@@ -4,9 +4,9 @@
     const COLORS = ['#a61b1b', '#2674a7', '#d97706'];
     const CATEGORY_NAMES = ['核心概念', '具体要素', '翻译难点'];
     const MODULES = {
-        politics: { label: '政治与治理', prefixes: ['A', 'B', 'C', 'E'] },
-        economy: { label: '经济与科技', prefixes: ['G', 'I'] },
-        culture: { label: '文化与传播', prefixes: ['J', 'L'] },
+        politics: { label: '政治与治理', prefixes: ['A', 'B', 'C', 'E', 'O'] },
+        economy: { label: '经济与科技', prefixes: ['G', 'I', 'P'] },
+        culture: { label: '文化与传播', prefixes: ['J', 'L', 'Q'] },
         education: { label: '教育发展', prefixes: ['F', 'H'] },
         public: { label: '公共服务', prefixes: ['M'] },
         ecology: { label: '生态文明', prefixes: ['N'] }
